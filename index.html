@@ -32,6 +32,9 @@
       --nav:rgba(11,16,32,.84)
     }
     *{box-sizing:border-box}
+    #three-bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.62}
+    .topbar,main,footer{position:relative;z-index:1}
+    @media(prefers-reduced-motion:reduce){#three-bg{opacity:.28}}
     html{scroll-behavior:smooth;scroll-padding-top:90px}
     body{margin:0;background:radial-gradient(ellipse at 82% 0%,rgba(104,87,245,.14),transparent 34rem),radial-gradient(ellipse at 0% 35%,rgba(19,184,166,.08),transparent 28rem),var(--bg);color:var(--text);font:400 16px/1.7 "DM Sans",sans-serif;transition:background .25s,color .25s}
     a{color:inherit}button{font:inherit}
@@ -262,12 +265,7 @@
 
       document.getElementById('contactForm').addEventListener('submit', function (event) {
         event.preventDefault();
-        // Replace this with your real email address before publishing.
-        var contactEmail = 'YOUR_EMAIL@example.com';
-        if (contactEmail === 'YOUR_EMAIL@example.com') {
-          alert('Please add your email address in the contactEmail variable in index.html first.');
-          return;
-        }
+        var contactEmail = 'ayushp1283@gmail.com';
         var name = document.getElementById('contactName').value.trim();
         var sender = document.getElementById('contactEmail').value.trim();
         var message = document.getElementById('contactMessage').value.trim();
@@ -277,5 +275,110 @@
       });
     }());
   </script>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'three-bg';
+    canvas.setAttribute('aria-hidden', 'true');
+    document.body.prepend(canvas);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 18;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+
+    const group = new THREE.Group();
+    scene.add(group);
+
+    const particleCount = window.innerWidth < 700 ? 260 : 620;
+    const positions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 34;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 24;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 18;
+    }
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const particleMaterial = new THREE.PointsMaterial({
+      color: 0x8d83ff, size: 0.045, transparent: true, opacity: 0.68,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    group.add(particles);
+
+    const shapes = [];
+    const wireMaterial = new THREE.MeshBasicMaterial({
+      color: 0x20cbb8, wireframe: true, transparent: true, opacity: 0.15
+    });
+    const shapeSpecs = [
+      [new THREE.IcosahedronGeometry(2.5, 1), [-8, 3, -3], [0.0018, 0.0024, 0.001]],
+      [new THREE.TorusKnotGeometry(1.45, 0.42, 90, 9), [8, -2, -5], [-0.0015, 0.002, 0.001]],
+      [new THREE.OctahedronGeometry(2.1, 1), [2, -7, -6], [0.001, -0.0018, 0.0015]]
+    ];
+    shapeSpecs.forEach(([geometry, position, speed]) => {
+      const mesh = new THREE.Mesh(geometry, wireMaterial.clone());
+      mesh.position.set(...position);
+      mesh.userData.speed = speed;
+      group.add(mesh);
+      shapes.push(mesh);
+    });
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let frame = 0;
+    let pointerX = 0, pointerY = 0;
+    window.addEventListener('pointermove', (event) => {
+      pointerX = (event.clientX / window.innerWidth - 0.5) * 0.7;
+      pointerY = (event.clientY / window.innerHeight - 0.5) * 0.5;
+    }, { passive: true });
+
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    }
+    window.addEventListener('resize', resize, { passive: true });
+
+    const themeObserver = new MutationObserver(() => {
+      const dark = document.documentElement.dataset.theme === 'dark';
+      particleMaterial.color.set(dark ? 0x9d91ff : 0x6557d9);
+      shapes.forEach(shape => shape.material.color.set(dark ? 0x42d9c5 : 0x159e91));
+      canvas.style.opacity = dark ? '.62' : '.38';
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const darkMode = document.documentElement.dataset.theme === 'dark';
+    particleMaterial.color.set(darkMode ? 0x9d91ff : 0x6557d9);
+    shapes.forEach(shape => shape.material.color.set(darkMode ? 0x42d9c5 : 0x159e91));
+    canvas.style.opacity = darkMode ? '.62' : '.38';
+
+    function animate() {
+      frame = requestAnimationFrame(animate);
+      if (!reducedMotion) {
+        particles.rotation.y += 0.00035;
+        particles.rotation.x += 0.00012;
+        group.rotation.y += (pointerX * 0.06 - group.rotation.y) * 0.012;
+        group.rotation.x += (-pointerY * 0.05 - group.rotation.x) * 0.012;
+        shapes.forEach(mesh => {
+          mesh.rotation.x += mesh.userData.speed[0];
+          mesh.rotation.y += mesh.userData.speed[1];
+          mesh.rotation.z += mesh.userData.speed[2];
+        });
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) cancelAnimationFrame(frame);
+      else animate();
+    });
+  </script>
+
 </body>
 </html>
